@@ -5,6 +5,7 @@ import(
 	"errors"
 	"time"
 	"backend-api/repository"
+	"backend-api/utils"
 )
 
 type AttendanceService interface {
@@ -49,7 +50,21 @@ func (s *attendanceService) ProcessCheckIn(ctx context.Context, userID int64) er
 		Status: status,	
 	}
 
-	return s.repo.RecordCheckIn(ctx, attendanceRecord)
+	err = s.repo.RecordCheckIn(ctx, attendanceRecord)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		event := utils.AttendanceEvent{
+			UserID: 	userID,
+			Timestamp:	currentTime.Format("2006-01-02 15:04:05"),
+			Type:		"CHECK_IN",
+		}
+		utils.PublishAttendanceEvent(event)
+	}()
+
+	return nil
 }
 
 func (s *attendanceService) ProcessCheckOut(ctx context.Context, userID int64) error {
