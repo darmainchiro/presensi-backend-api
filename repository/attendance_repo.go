@@ -29,25 +29,32 @@ func NewPostgresAttendanceRepository(db *sql.DB) AttendanceRepository {
 	return &postgreAttendanceRepository{db: db}
 }
 
-func (r *postgreAttendanceRepository) RecordCheckIn(ctx context.Context, a *Attendance) error {
+func (r *postgreAttendanceRepository) RecordCheckIn(ctx context.Context, attendance *Attendance) error {
 	query := `INSERT INTO attendances (user_id, check_in_time, status)
 			  VALUES ($1, $2, $3)`
 	
-	err := r.db.QueryRowContext(ctx, query, a.UserID, a.CheckInTime, a.Status).Scan(&a.ID)
-	return err
+	_, err := r.db.ExecContext(ctx, query, attendance.UserID, attendance.CheckInTime, attendance.Status)
+	
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *postgreAttendanceRepository) CheckAttendanceToday(ctx context.Context, userID int64) (bool, error) {
-	query := `SELECT COUNT(*) FROM attendances 
+	var id int
+	query := `SELECT id FROM attendances 
 			  WHERE user_id = $1 AND DATE(check_in_time) = CURRENT_DATE`
 
-	var count int
-	err := r.db.QueryRowContext(ctx, query, userID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, query, userID).Scan(&id) 
+	
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil 
+		}
 		return false, err
 	}
-
-	return count > 0, nil
+	return true, nil
 }
 
 func (r *postgreAttendanceRepository) GetAttendanceToday(ctx context.Context, userID int64) (*Attendance, error) {
